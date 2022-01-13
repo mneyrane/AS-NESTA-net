@@ -33,7 +33,7 @@
 %
 function [x_final,all_iterates] = nn_nesta_bernoulli_wqcbp(y1, y2, z0, opB, opW, L_W, num_iters, eta, mu, store_hist)
 
-c = norm(opB(double(1:length(y1) == 1),0))^2; % -- could make this optional or an input --
+c = norm(opB(double(1:length(y1) == 1),0))^2;
 
 z = z0;
 q_v = z0;

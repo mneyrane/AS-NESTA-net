@@ -29,7 +29,7 @@
 %
 function [x_final,all_iterates] = nn_nesta_wqcbp(y, z0, opA, opW, L_W, num_iters, eta, mu, store_hist)
 
-c = norm(opA(double(1:length(y) == 1),0),2)^2; % -- could make this optional or an input --
+c = norm(opA(double(1:length(y) == 1),0),2)^2;
 
 z = z0;
 q_v = z0;

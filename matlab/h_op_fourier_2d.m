@@ -24,7 +24,7 @@ function y=h_op_fourier_2d(x, mode, N, idx)
         y = z(idx);
         y = y(:);
 
-    else % Transpose
+    else % adjoint
 
         z = zeros([N, N]);
         z(idx) = x;
