@@ -1,20 +1,44 @@
+"""
+-- Maksym Neyra-Nesterenko
+-- mneyrane@sfu.ca
+"""
+import numpy as np
 import torch
 import torch.fft as FT
+from scipy.optimize import bisect
 
-""" Huber function gradient """
 def huber_fn_gradient(x, mu):
+    """ Huber function gradient """
     y = torch.zeros_like(x)
-    mask = torch.abs(x) <= mu
+    
+    with torch.no_grad():
+        mask = torch.abs(x) <= mu
+    
     y[mask] = x[mask]/mu
     y[~mask] = x[~mask] / torch.abs(x[~mask])
     return y
 
-""" 2-D discrete gradient (TV) operator 
-
-Endpoint boundary condition is periodic, so that grad xn = x1 - xn.
-"""
 def discrete_gradient_2d(x,mode,N1,N2):
-    
+    """2-D anisotropic discrete gradient (TV) operator 
+
+    Periodic boundary conditions are used. The parameters N1 and N2
+    are the height and width of the image x.
+
+    For the forward operator, x is expected to a vectorized matrix X
+    in row-major order (C indexing). The output is a stacking of 
+    vectorized vertical and horizontal gradients.
+
+    From the definition of the adjoint, if you have two N1xN2 matrices 
+    X1, X2, then the adjoint computes the vectorization of
+
+        grad_vert_adjoint(X1) + grad_hori_adjoint(X2).
+
+    Thus, the input x for the adjoint should be a stacking of vectorizations
+    of X1, X2, in row-major order. That is:
+
+        x = torch.stack([X1.reshape(-1), X2.reshape(-1)], dim=2)
+    """
+   
     assert len(x.shape) == 1, 'Input x is not a vector'
 
     if mode == True:
@@ -24,110 +48,114 @@ def discrete_gradient_2d(x,mode,N1,N2):
         y1, y2 = torch.zeros_like(x), torch.zeros_like(x)
         
         # vertical (axis) gradient
-        y1 = torch.roll(x,-1,-1) - x
+        y1 = torch.roll(x,-1,0) - x
 
         # horizontal (axis) gradient
-        y2 = torch.roll(x,-1,-2) - x
+        y2 = torch.roll(x,-1,1) - x
 
-        y = torch.stack([y1,y2], dim=-3)
+        y = torch.stack([y1,y2], dim=2)
         
         return y.reshape(-1)
 
     else:
        
-        y = torch.zeros((N2,N1), dtype=x.dtype)
-
-        x = x.reshape((2,N2,N1))
+        x = x.reshape((N1,N2,2))
         
         # vertical (axis) gradient transpose
-        y = y + torch.roll(x[0,:,:],1,-1) - x[0,:,:] 
+        y = torch.roll(x[:,:,0],1,0) - x[:,:,0] 
         
         # horizontal (axis) gradient transpose
-        y = y + torch.roll(x[1,:,:],1,-2) - x[1,:,:]
+        y = y + torch.roll(x[:,:,1],1,1) - x[:,:,1]
         
         return y.reshape(-1)
 
-""" 2-D discrete Fourier transform 
+def fourier_2d(x, mode, N, mask, use_gpu=False):
+    """ 2-D discrete Fourier transform 
 
-Normalized so that the forward and inverse mappings are unitary.
-"""
-def fourier_2d(x, mode, N, mask):
+    Normalized so that the forward and inverse mappings are unitary.
+
+    The parameter 'mask' is assumed to be a NxN boolean matrix, used as a 
+    sampling mask for Fourier frequencies.
+    """
+
     assert len(x.shape) == 1, 'Input x is not a vector'
     
     if mode == True:
-        z = FT.fftshift(FT.fft2(x.reshape((N,N)), norm='ortho'),(-2,-1))
+        z = FT.fftshift(FT.fft2(x.reshape((N,N)), norm='ortho'))
         y = z[mask]
         return y.reshape(-1)
     
     else: # adjoint
         z = torch.zeros(N*N,dtype=x.dtype)
+        if use_gpu:
+            z = z.cuda()
+        
         mask = mask.reshape(-1)
+
         z[mask] = x
         z = z.reshape((N,N))
-        y = FT.ifft2(FT.fftshift(z,(-2,-1)), norm='ortho')
+        y = FT.ifft2(FT.fftshift(z), norm='ortho')
         return y.reshape(-1)
 
-""" 2-D discrete Haar wavelet transform  
-
-Boundary conditions are resolved with periodic padding:
-
-    ... xn | x1 x2 ... xn | x1 x2 ...
-
-The filters are normalized so that the forward and inverse mappings are
-unitary.
-"""
 def discrete_haar_wavelet(x, mode, N, levels=1):
+    """ 2-D discrete Haar wavelet transform  
+
+    Boundary conditions are resolved with periodic padding.
+
+    The filters are normalized so that the forward and inverse mappings are
+    unitary.
+    """
     assert N % 2 == 0
     c = 0.5
  
     X = x.reshape((N,N))
     Y = torch.zeros_like(X)
     
-    if mode == True: # decomposition
+    if mode == 1: # decomposition
+
         Np = N
+
         for level in range(levels):
-            Np = Np//2
-
-            ll = c*(X[::2,::2]+X[::2,1::2]+X[1::2,::2]+X[1::2,1::2]) # approx
-            lh = c*(X[::2,::2]+X[::2,1::2]-X[1::2,::2]-X[1::2,1::2]) # horizontal 
-            hl = c*(X[::2,::2]-X[::2,1::2]+X[1::2,::2]-X[1::2,1::2]) # vertical
-            hh = c*(X[::2,::2]-X[::2,1::2]-X[1::2,::2]+X[1::2,1::2]) # diagonal
-
-            Y[Np:,Np:] = hh
-            Y[Np:,:Np] = hl
-            Y[:Np,Np:] = lh
+            Nt = Np
+            Np = Nt//2
+            
+            # approximation coeffs
+            ll = c*(X[::2,::2]+X[::2,1::2]+X[1::2,::2]+X[1::2,1::2])
+            # horizontal details
+            lh = c*(X[::2,::2]+X[::2,1::2]-X[1::2,::2]-X[1::2,1::2])
+            # vertical details
+            hl = c*(X[::2,::2]-X[::2,1::2]+X[1::2,::2]-X[1::2,1::2])
+            # diagonal details
+            hh = c*(X[::2,::2]-X[::2,1::2]-X[1::2,::2]+X[1::2,1::2])
+            
+            Y[Np:Nt,Np:Nt] = hh
+            Y[Np:Nt,:Np] = hl
+            Y[:Np,Np:Nt] = lh
             X = ll
 
-        Y[:Np,:Np] = ll
+        Y[:Np,:Np] = X
 
         return Y.reshape(-1)
 
     else: # reconstruction
+
         Np = N//(2**levels)
         Nt = 2*Np
+
         for level in range(levels):
             ll = X[:Np,:Np]
             lh = X[:Np,Np:Nt]
             hl = X[Np:Nt,:Np]
             hh = X[Np:Nt,Np:Nt]
 
-            print('SHAPE:', ll.shape)
-
             Y[:Nt:2,:Nt:2] = c*(ll + lh + hl + hh)
             Y[:Nt:2,1:Nt:2] = c*(ll + lh - hl - hh)
             Y[1:Nt:2,:Nt:2] = c*(ll - lh + hl - hh)
             Y[1:Nt:2,1:Nt:2] = c*(ll - lh - hl + hh)
             
+            X[:Nt,:Nt] = Y[:Nt,:Nt]
+
             Np = Nt
             Nt = 2*Np
 
         return Y.reshape(-1)
-
-if __name__ == '__main__':
-    X = torch.arange(16)
-    mask = torch.rand((4,4)) < 10
-    print('mask:', mask)
-    FX = fourier_2d(X,4,mask)
-    print(FX)
-    FFX = fourier_2d(FX,4,mask,adjoint=True)
-    print(FFX)
