@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Generate plots of exponential decay in the image reconstruction error when
-using restarted NESTA.
+Compare recoveries of TV-Haar, TV, and Haar minimization.
 
-The setup is to solve a smoothed analysis QCBP problem with a TV-Haar analysis 
-operator to recover an image from subsampled Fourier measurements.
+The setup is to solve a smoothed analysis QCBP problem with a TV-Haar, TV,
+and Haar analysis operators to recover an image from subsampled Fourier 
+measurements.
 
 -- Maksym Neyra-Nesterenko
 -- mneyrane@sfu.ca
@@ -34,12 +34,12 @@ with Image.open("../demo_images/phantom_brain_512.png") as im:
 ### parameters
 
 # fixed parameters
-eta = 10**(np.arange(0,-4,-1,dtype=float)) # noise level
-sample_rate = 0.15          # sample rate
-outer_iters = 15            # num of restarts + 1
-r = 1/4                     # decay factor
-zeta = 1e-12                # CS error parameter
-delta = 0.055               # rNSP parameter
+eta = 1e-3          # noise level
+sample_rate = 0.25  # sample rate
+outer_iters = 15    # num of restarts + 1
+r = 1/4             # decay factor
+zeta = 1e-12        # CS error parameter
+delta = 0.050       # rNSP parameter
 
 # inferred parameters (mu and inner_iters are defined later)
 eps0 = np.linalg.norm(X,'fro')
@@ -62,9 +62,8 @@ uni_mask[~var_mask] = uni_mask_cond
 
 # logical OR the two masks
 mask = uni_mask | var_mask
-assert np.sum(mask) == np.sum(var_mask)+np.sum(uni_mask)
 
-Image.fromarray(mask).save('NESTA_TV_Haar_restarts-mask.png')
+assert np.sum(mask) == np.sum(var_mask)+np.sum(uni_mask)
 
 m_exact = np.sum(mask)
 mask_t = (torch.from_numpy(mask)).bool().cuda()
@@ -102,8 +101,19 @@ while N % 2**(nlevmax+1) == 0:
 
 assert nlevmax > 0
 
-tv_haar = lambda x, mode: custom_op_tv_haar(x,mode,N,nlevmax)
-sqrt_beta_tv_haar = 2.0
+op_tv_haar = lambda x, mode: custom_op_tv_haar(x,mode,N,nlevmax)
+op_tv = lambda x, mode: operators.discrete_gradient_2d(x,mode,N,N)
+op_haar = lambda x, mode: operators.discrete_haar_wavelet(x,mode,N,nlevmax)
+
+L_tv_haar = 2.
+L_tv = 2.
+L_haar = 1.
+
+op_params = {
+    "tv-haar" : (op_tv_haar, L_tv_haar), 
+    "tv" : (op_tv, L_tv), 
+    "haar" : (op_haar, L_haar),
+}
 
 
 ### compute normalizing constant for orthonormal rows of A
@@ -113,76 +123,61 @@ c = torch.linalg.norm(subsampled_ft(e1,0), 2)**2
 c = c.cpu()
 
 
-### reconstruct image using restarted NESTA for each eta value
+### define the inverse problem
 
-# create variables that are only need to be created once
 X_flat_t = torch.from_numpy(np.reshape(X,N*N))
 
-norm_fro_X = np.linalg.norm(X,'fro')
+noise = torch.randn(m_exact) + 1j*torch.rand(m_exact)
+noise = eta * noise / torch.linalg.norm(noise,2)
 
-inner_iters = math.ceil(sqrt_beta_tv_haar*(4+r)/(r*math.sqrt(N)*delta))
+y = subsampled_ft(X_flat_t,1) + noise
+
+
+### reconstruct image using restarted NESTA for each analysis operator
+
+# fix the inner iterations for each analysis operator
+inner_iters = math.ceil(L_tv_haar*(4+r)/(r*math.sqrt(N)*delta))
 print('Inner iterations:', inner_iters)
 
+# compute mu
 mu = []
 eps = eps0
 for k in range(outer_iters):
     mu.append(r*delta*eps)
     eps = r*eps + zeta
 
-rel_errs_dict = dict()
-
-for noise_level in eta:
-    
-    ### define the inverse problem
-
-    noise = torch.randn(m_exact) + 1j*torch.rand(m_exact)
-    e = noise_level * noise / torch.linalg.norm(noise,2)
-
-    y = subsampled_ft(X_flat_t,1) + e
-    
+norm_fro_X = np.linalg.norm(X,'fro')
+ 
+for op_name in op_params:
     
     ### compute restarted NESTA solution
+
+    opW, L_W = op_params[op_name]
     
     z0 = torch.zeros(N*N,dtype=y.dtype)
         
     y = y.cuda()
     z0 = z0.cuda()
 
-    X_rec_t, iterates = nn.restarted_nesta_wqcbp(
+    X_rec_t, _ = nn.restarted_nesta_wqcbp(
             y, z0,
-            subsampled_ft, tv_haar, 
-            c, sqrt_beta_tv_haar,
+            subsampled_ft, opW, 
+            c, L_W,
             inner_iters, outer_iters,
-            noise_level, mu, True)
+            eta, mu, False)
 
 
     ### extract restart values
 
-    final_its = [torch.reshape(its[-1],(N,N)) for its in iterates]
+    X_rec_t = X_rec_t.cpu()
+    X_rec = np.reshape(X_rec_t.numpy(),(N,N))
+    
+    print("Relative error of final iterate for %s: %.5e" % (op_name, np.linalg.norm(X-X_rec,'fro')/norm_fro_X))
 
-    rel_errs = list()
+    ### save reconstructed image
 
-    for X_final in final_its:
-        X_final = X_final.cpu().numpy()
-        rel_errs.append(np.linalg.norm(X-X_final,'fro')/norm_fro_X)
+    #X_rec_t = X_rec_t.cpu()
+    #X_rec = np.reshape(np.abs(X_rec_t.numpy()),(N,N))
+    #im_rec = np.clip((X_rec*255),0,255).astype('uint8')
 
-    rel_errs_dict[noise_level] = rel_errs
-
-
-### plots
-
-sns.set(context='paper', style='whitegrid')
-
-for noise_level in eta:
-    end_idx = len(rel_errs_dict[noise_level])+1
-    plt.semilogy(
-        range(1,end_idx), 
-        rel_errs_dict[noise_level], 
-        label='%.e' % noise_level,
-        marker='*',
-        linewidth=1)
-
-plt.xlabel('Restart')
-plt.ylabel('Relative error')
-plt.legend(loc='lower left')
-plt.savefig('NESTA_TV_Haar_restarts-plot.png', dpi=300)
+    #Image.fromarray(im_rec).save('NESTA_TV_Haar_restarts_recon.png')

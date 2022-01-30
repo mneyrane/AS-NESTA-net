@@ -12,25 +12,23 @@ from scipy.optimize import bisect
 def bernoulli_sampling_probs_2d(hist,N,m):
     """
     Computes the Bernoulli model probabilities from a NxN histogram 
-    representing the target (possibly unnormalized) distribution.
+    representing the target (possibly unnormalized) distribution,
+    where if one performs a single Bernoulli trial for each probability,
+    the expected number of successes is m.
 
     Returns probs, which can be used to produce a sample mask using
 
     > np.random.binomial(1,probs)
 
     or using the `generate_sampling_mask_from_probs` function below.
-
-    where the number of samples (successes) are m in expectation.
     """
     assert hist.dtype == np.float64
 
     if np.all(m*hist <= 1.0): # avoid computation for trivial case
         return m*hist
 
-    C = bisect(_phi, 0.0, 1.0, args=(m, hist), xtol=1e-12, maxiter=1000)
+    C = bisect(_constraint, 0.0, 1.0, args=(m, hist), xtol=1e-12, maxiter=1000)
 
-    print("Estimated value of C (normalizing constant):", C)
-     
     terms = m*C*hist
     probs = np.where(terms < 1, terms, 1)
 
@@ -69,12 +67,9 @@ def optimal_hist_2d(N):
     return hist
     
 def gaussian_multilevel_sampling(N):
-    """
-    TO DO ...
-    """
-    pass
+    raise NotImplementedError('Gaussian multilevel sampling not available')
 
-def _phi(t, m, hist):
+def _constraint(t, m, hist):
     terms = t*m*hist
     probs = np.where(terms < 1, terms, 1)
     return np.sum(probs)-m

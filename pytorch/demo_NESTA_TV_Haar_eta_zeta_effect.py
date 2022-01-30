@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Generate plots of exponential decay in the image reconstruction error when
-using restarted NESTA.
+Compares the effect of setting eta and zeta when reconstructing an image
+using restarted NESTA for measurements with no noise.
 
 The setup is to solve a smoothed analysis QCBP problem with a TV-Haar analysis 
 operator to recover an image from subsampled Fourier measurements.
@@ -15,8 +15,9 @@ import sampling
 import nn
 import torch
 import numpy as np
-import seaborn as sns
+#import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 from PIL import Image
 
 
@@ -33,16 +34,17 @@ with Image.open("../demo_images/phantom_brain_512.png") as im:
 
 ### parameters
 
+# grid parameters
+eta = 10**(np.arange(2,-8,-1,dtype=float))  # noise level
+zeta = 10**(np.arange(2,-8,-1,dtype=float)) # CS error parameter
+
 # fixed parameters
-eta = 10**(np.arange(0,-4,-1,dtype=float)) # noise level
-sample_rate = 0.15          # sample rate
-outer_iters = 15            # num of restarts + 1
-r = 1/4                     # decay factor
-zeta = 1e-12                # CS error parameter
-delta = 0.055               # rNSP parameter
+sample_rate = 0.25  # sample rate
+outer_iters = 15    # num of restarts + 1
+r = 1/4             # decay factor
+delta = 0.055       # rNSP parameter
 
 # inferred parameters (mu and inner_iters are defined later)
-eps0 = np.linalg.norm(X,'fro')
 
 N, _ = X.shape              # image size (assumed to be N by N)
 m = (sample_rate/2)*N*N     # expected number of measurements
@@ -64,7 +66,7 @@ uni_mask[~var_mask] = uni_mask_cond
 mask = uni_mask | var_mask
 assert np.sum(mask) == np.sum(var_mask)+np.sum(uni_mask)
 
-Image.fromarray(mask).save('NESTA_TV_Haar_restarts-mask.png')
+Image.fromarray(mask).save('NESTA_TV_Haar_eta_zeta_effect-mask.png')
 
 m_exact = np.sum(mask)
 mask_t = (torch.from_numpy(mask)).bool().cuda()
@@ -117,72 +119,53 @@ c = c.cpu()
 
 # create variables that are only need to be created once
 X_flat_t = torch.from_numpy(np.reshape(X,N*N))
+y = subsampled_ft(X_flat_t,1)
 
 norm_fro_X = np.linalg.norm(X,'fro')
 
 inner_iters = math.ceil(sqrt_beta_tv_haar*(4+r)/(r*math.sqrt(N)*delta))
 print('Inner iterations:', inner_iters)
 
-mu = []
-eps = eps0
-for k in range(outer_iters):
-    mu.append(r*delta*eps)
-    eps = r*eps + zeta
+eta_grid, zeta_grid = np.meshgrid(eta, zeta, indexing='ij')
 
-rel_errs_dict = dict()
+rel_errs = np.zeros(eta_grid.shape, dtype=float)
 
-for noise_level in eta:
-    
-    ### define the inverse problem
+for i in range(len(eta)):
+    for j in range(len(zeta)):
+        print('(i,j) =', (i,j))
+        eta_val, zeta_val = eta_grid[i,j], zeta_grid[i,j]
 
-    noise = torch.randn(m_exact) + 1j*torch.rand(m_exact)
-    e = noise_level * noise / torch.linalg.norm(noise,2)
-
-    y = subsampled_ft(X_flat_t,1) + e
-    
-    
-    ### compute restarted NESTA solution
-    
-    z0 = torch.zeros(N*N,dtype=y.dtype)
+        ### compute restarted NESTA solution
         
-    y = y.cuda()
-    z0 = z0.cuda()
+        z0 = torch.zeros(N*N,dtype=y.dtype)
+        
+        eps0 = max(norm_fro_X, zeta_val)
 
-    X_rec_t, iterates = nn.restarted_nesta_wqcbp(
-            y, z0,
-            subsampled_ft, tv_haar, 
-            c, sqrt_beta_tv_haar,
-            inner_iters, outer_iters,
-            noise_level, mu, True)
+        mu = []
+        eps = eps0
+        for k in range(outer_iters):
+            mu.append(r*delta*eps)
+            eps = r*eps + zeta_val
 
+        y = y.cuda()
+        z0 = z0.cuda()
 
-    ### extract restart values
+        X_rec_t, _ = nn.restarted_nesta_wqcbp(
+                y, z0,
+                subsampled_ft, tv_haar, 
+                c, sqrt_beta_tv_haar,
+                inner_iters, outer_iters,
+                eta_val, mu, False)
 
-    final_its = [torch.reshape(its[-1],(N,N)) for its in iterates]
+        X_rec = X_rec_t.cpu().numpy()
+        X_rec = np.reshape(X_rec, (N,N))
 
-    rel_errs = list()
-
-    for X_final in final_its:
-        X_final = X_final.cpu().numpy()
-        rel_errs.append(np.linalg.norm(X-X_final,'fro')/norm_fro_X)
-
-    rel_errs_dict[noise_level] = rel_errs
-
+        rel_errs[i,j] = np.linalg.norm(X-X_rec,'fro')/norm_fro_X
 
 ### plots
 
-sns.set(context='paper', style='whitegrid')
-
-for noise_level in eta:
-    end_idx = len(rel_errs_dict[noise_level])+1
-    plt.semilogy(
-        range(1,end_idx), 
-        rel_errs_dict[noise_level], 
-        label='%.e' % noise_level,
-        marker='*',
-        linewidth=1)
-
-plt.xlabel('Restart')
-plt.ylabel('Relative error')
-plt.legend(loc='lower left')
-plt.savefig('NESTA_TV_Haar_restarts-plot.png', dpi=300)
+plt.imshow(rel_errs, norm=LogNorm(), interpolation='none')
+plt.colorbar()
+plt.xlabel('zeta parameter')
+plt.ylabel('noise level')
+plt.savefig('NESTA_TV_Haar_eta_zeta_effect-plot.png', dpi=300)
