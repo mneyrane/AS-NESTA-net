@@ -27,7 +27,7 @@ from PIL import Image
 
 ### load image
 
-with Image.open("../demo_images/phantom_brain_512.png") as im:
+with Image.open("../demo_images/brain_512.png") as im:
     X = np.asarray(im).astype(float) / 255
 
 
@@ -35,11 +35,11 @@ with Image.open("../demo_images/phantom_brain_512.png") as im:
 
 # fixed parameters
 eta = 1e-3          # noise level
-sample_rate = 0.25  # sample rate
+sample_rate = 0.30  # sample rate
 outer_iters = 15    # num of restarts + 1
-r = 1/4             # decay factor
+r = 1/5             # decay factor
 zeta = 1e-12        # CS error parameter
-delta = 0.050       # rNSP parameter
+delta = 0.04         # rNSP parameter
 
 # inferred parameters (mu and inner_iters are defined later)
 eps0 = np.linalg.norm(X,'fro')
@@ -176,8 +176,12 @@ for op_name in op_params:
 
     ### save reconstructed image
 
-    #X_rec_t = X_rec_t.cpu()
-    #X_rec = np.reshape(np.abs(X_rec_t.numpy()),(N,N))
-    #im_rec = np.clip((X_rec*255),0,255).astype('uint8')
+    im_rec = np.clip(np.abs(X_rec)*255,0,255).astype('uint8')
 
-    #Image.fromarray(im_rec).save('NESTA_TV_Haar_restarts_recon.png')
+    Image.fromarray(im_rec).save(
+        'NESTA_TV_Haar_compare_analysis_ops-%s_recon.png' % op_name)
+
+    im_err = np.clip(np.abs(X_rec-X)*255,0,255).astype('uint8')
+
+    Image.fromarray(im_err).save(
+        'NESTA_TV_Haar_compare_analysis_ops-%s_error.png' % op_name)
