@@ -34,13 +34,15 @@ with Image.open("../demo_images/phantom_brain_512.png") as im:
 ### parameters
 
 # fixed parameters
-eta = 1e-5          # noise level
+eta = 1e-1          # noise level
 sample_rate = 0.15  # sample rate
 outer_iters = 15    # num of restarts + 1
 r = 1/4             # decay factor 
 zeta = 1e-12        # CS error parameter
 delta = 0.055       # rNSP parameter
-nesta_mu = 1e-4     # smoothing parameter for NESTA (without restarts)
+
+# smoothing parameter for NESTA (without restarts)
+nesta_mu = 10**np.arange(-2,-6,-1, dtype=float) 
 
 # inferred parameters (mu and inner_iters are defined later)
 eps0 = np.linalg.norm(X,'fro')
@@ -143,59 +145,51 @@ for k in range(outer_iters):
 y = y.cuda()
 z0 = z0.cuda()
 
-X_final_r_t, restarted_iterates = nn.restarted_nesta_wqcbp(
-        y, z0,
-        subsampled_ft, tv_haar, 
-        c, sqrt_beta_tv_haar,
-        inner_iters, outer_iters,
-        eta, mu, True)
-
-X_final_n_t, nesta_iterates = nn.nesta_wqcbp(
-        y, z0, 
-        subsampled_ft, tv_haar,
-        c, sqrt_beta_tv_haar,
-        total_iters, 
-        eta, nesta_mu, True)
-
-
-### extract restart values
+# compute restarted NESTA solution and compute relative error of iterates
+_, restarted_iterates = nn.restarted_nesta_wqcbp(
+    y, z0,
+    subsampled_ft, tv_haar, 
+    c, sqrt_beta_tv_haar,
+    inner_iters, outer_iters,
+    eta, mu, True)
 
 r_its = [
     torch.reshape(it,(N,N))
     for re_its in restarted_iterates for it in re_its[1:]
 ]
-n_its = [
-    torch.reshape(it,(N,N))
-    for it in nesta_iterates[1:]
-]
 
 r_rel_errs = list()
-n_rel_errs = list()
 
 for it in r_its:
     X_it = it.cpu().numpy()
     r_rel_errs.append(np.linalg.norm(X-X_it,'fro')/norm_fro_X)
 
-for it in n_its:
-    X_it = it.cpu().numpy()
-    n_rel_errs.append(np.linalg.norm(X-X_it,'fro')/norm_fro_X)
 
+# compute NESTA solutions and relative error of iterates
+n_rel_errs = dict()
 
-### save reconstructed image
+for n_mu in nesta_mu:
+    n_rel_errs[n_mu] = list()
 
-X_rec_r_t = X_final_r_t.cpu()
-X_rec_n_t = X_final_n_t.cpu()
+    _, nesta_iterates = nn.nesta_wqcbp(
+        y, z0, 
+        subsampled_ft, tv_haar,
+        c, sqrt_beta_tv_haar,
+        total_iters, 
+        eta, n_mu, True)
 
-X_rec_r = np.reshape(np.abs(X_rec_r_t.numpy()),(N,N))
-X_rec_n = np.reshape(np.abs(X_rec_n_t.numpy()),(N,N))
+    n_its = [
+        torch.reshape(it,(N,N))
+        for it in nesta_iterates[1:]
+    ]
 
-im_rec_r = np.clip((X_rec_r*255),0,255).astype('uint8')
-im_rec_n = np.clip((X_rec_n*255),0,255).astype('uint8')
+    for it in n_its:
+        X_it = it.cpu().numpy()
+        n_rel_errs[n_mu].append(np.linalg.norm(X-X_it,'fro')/norm_fro_X)
 
-Image.fromarray(im_rec_r).save('NESTA_TV_Haar_compare_without_restarts-r_recon.png')
-Image.fromarray(im_rec_n).save('NESTA_TV_Haar_compare_without_restarts-n_recon.png')
+    del nesta_iterates
 
-assert len(r_rel_errs) == len(n_rel_errs)
+assert len(r_rel_errs) == len(n_rel_errs[nesta_mu[0]])
 assert len(r_rel_errs) == total_iters
 
 
@@ -209,11 +203,12 @@ plt.semilogy(
     label='With restarts',
     linewidth=1)
 
-plt.semilogy(
-    range(1,total_iters+1), 
-    n_rel_errs, 
-    label='No restarts',
-    linewidth=1)
+for n_mu in n_rel_errs:
+    plt.semilogy(
+        range(1,total_iters+1), 
+        n_rel_errs[n_mu], 
+        label='No restarts, mu = %.e' % n_mu,
+        linewidth=1)
 
 plt.xlabel('Iteration')
 plt.ylabel('Relative error')
