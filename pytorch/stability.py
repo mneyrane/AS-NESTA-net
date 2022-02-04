@@ -67,6 +67,7 @@ def adversarial_perturbation(x, opA, opR, c_A, eta, num_trials, iters_per_trial,
         e.requires_grad_()
         
         optimizer = torch.optim.SGD([e], lr=lr)
+        #scheduler = ...
         
         for i in range(iters_per_trial):
             # descent step
@@ -84,9 +85,8 @@ def adversarial_perturbation(x, opA, opR, c_A, eta, num_trials, iters_per_trial,
                 obj_val = -torch.real(obj_fn(e))
                 obj_val = obj_val.cpu()
                 print(
-                    'Step', i+1, 
-                    'norm(e):', min(eta, float(e_len)),
-                    'obj_val:', float(obj_val),
+                    'Step %d -- norm(e): %.5e -- obj val: %.5e' % 
+                    (i+1, min(eta, float(e_len)), float(obj_val))
                 )
 
             # for autograd
@@ -95,12 +95,12 @@ def adversarial_perturbation(x, opA, opR, c_A, eta, num_trials, iters_per_trial,
         with torch.no_grad():
             z = opA(e,0)/c_A
             
-            torch.testing.assert_close(opA(z,1),e)
-            torch.testing.assert_close(opA(x+z,1),y+e) 
+            #torch.testing.assert_close(opA(z,1),e)
+            #torch.testing.assert_close(opA(x+z,1),y+e) 
             
             Ry_e = opR(opA(x+z,1))
             
-            err = torch.linalg.norm(Ry_e-Ry,ord=float('inf'))
+            err = torch.linalg.norm(Ry_e-Ry,ord=2)
             
             if err > max_err:
                 print("Found noise with higher error at trial", t)

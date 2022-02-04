@@ -17,27 +17,41 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
-from glob import glob
 
 ### fix the RNG seed for debugging
 #torch.manual_seed(0)
 #np.random.seed(0)
 
+
+### load image
+
+with Image.open("../demo_images/brain_512.png") as im:
+    X = np.asarray(im).astype(float) / 255
+
+
 ### fixed parameters
-N = 512             # image height and width
-eta = 1e-1          # noise level
-sample_rate = 0.20  # sample rate
+eta = 2.5e1           # noise level
+sample_rate = 0.25  # sample rate
 outer_iters = 6     # num of restarts + 1
 r = 1/4             # decay factor
 zeta = 1e-12        # CS error parameter
-delta = 0.1         # rNSP parameter
+delta = 0.2         # rNSP parameter
+
+pga_num_trials = 50
+pga_iters_per_trial = 20
+pga_lr = 0.1*eta
+
 
 # inferred parameters 
 # (some of these are defined early since they we will define the
 #  reconstruction map via an anonymous function)
+eps0 = np.linalg.norm(X,'fro')
+
+N, _ = X.shape              # image size (assumed to be N by N)
+m = (sample_rate/2)*N*N     # expected number of measurements
 
 mu = []
-eps = float(N)
+eps = eps0
 for k in range(outer_iters):
     mu.append(r*delta*eps)
     eps = r*eps + zeta
@@ -46,8 +60,6 @@ sqrt_beta_tv_haar = 2.0
 
 inner_iters = math.ceil(sqrt_beta_tv_haar*(4+r)/(r*math.sqrt(N)*delta))
 print('Inner iterations:', inner_iters)
-
-m = (sample_rate/2)*N*N     # expected number of measurements
 
 
 ### generate sampling mask
@@ -130,89 +142,75 @@ def recon_map(y):
         eta, mu, False)
     return rec
 
-image_files = glob("../demo_images/*%d.png" % N)
 
-for im_path in image_files:
-    im_name, _ = os.path.splitext(os.path.basename(im_path))
-    
-    print("EXPERIMENT WITH %s" % im_path)
+### compute measurements
 
-    ### load image
-    with Image.open(im_path) as im:
-        X = np.asarray(im).astype(float) / 255
+X_flat_t = torch.from_numpy(np.reshape(X,N*N))
+X_flat_t = X_flat_t.cuda()
 
-    ### compute measurements
-    
-    X_flat_t = torch.from_numpy(np.reshape(X,N*N))
-    X_flat_t = X_flat_t.cuda()
-    
-    y = subsampled_ft(X_flat_t,1)
-    y = y.cuda()
+y = subsampled_ft(X_flat_t,1)
+y = y.cuda()
 
-    
-    ### reconstruct image using restarted NESTA 
 
-    X_rec_t = recon_map(y)
+### reconstruct image using restarted NESTA 
 
-    ### save reconstructions
+X_rec_t = recon_map(y)
 
-    X_rec_t = X_rec_t.cpu()
-    X_rec = np.reshape(X_rec_t.numpy(),(N,N))
-    im_rec = np.clip(np.abs(X_rec)*255,0,255).astype('uint8')
+### save reconstructions
 
-    print(
-        "Relative error of reconstruction for", 
-        im_name, ":", 
-        np.linalg.norm(X-X_rec,'fro')/np.linalg.norm(X,'fro'))
+X_rec_t = X_rec_t.cpu()
+X_rec = np.reshape(X_rec_t.numpy(),(N,N))
+im_rec = np.clip(np.abs(X_rec)*255,0,255).astype('uint8')
 
-    Image.fromarray(im_rec).save(
-        'NESTA_TV_Haar_stability-%s_im_rec.png' % im_name)
-    
+print(
+    "Relative error of reconstruction:", 
+    np.linalg.norm(X-X_rec,'fro')/np.linalg.norm(X,'fro'))
 
-    ### compute worst-case perturbation
+Image.fromarray(im_rec).save('NESTA_TV_Haar_stability-im_rec.png')
 
-    adv_pert_t, X_pert_t, X_pert_rec_t = stability.adversarial_perturbation(
-        X_flat_t, subsampled_ft, recon_map, 
-        c_A=c, eta=eta, 
-        num_trials=10, iters_per_trial=5, lr=0.005, 
-        use_gpu=True)
-    
-    adv_pert_t = adv_pert_t.cpu()
-    X_pert_t = X_pert_t.cpu()
-    X_pert_rec_t = X_pert_rec_t.cpu()
-    
-    adv_pert = np.reshape(adv_pert_t.numpy(),(N,N))
-    X_pert = np.reshape(X_pert_t.numpy(),(N,N))
-    X_pert_rec = np.reshape(X_pert_rec_t.numpy(),(N,N))
 
-    print(
-        "Perturbation size:", 
-        np.linalg.norm(adv_pert,'fro'))
-    print(
-        "Perturbation reconstruction relative error:", 
-        np.linalg.norm(X_rec-X_pert_rec,'fro')/np.linalg.norm(X_rec,'fro'))
+### compute worst-case perturbation
 
-    # show adversarial perturbation rescaled
-    plt.figure()
-    plt.imshow(np.abs(adv_pert))#,interpolation='none')
-    plt.colorbar()
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig('NESTA_TV_Haar_stability-%s_adv_pert.png' % im_name, dpi=300)
+adv_pert_t, X_pert_t, X_pert_rec_t = stability.adversarial_perturbation(
+    X_flat_t, subsampled_ft, recon_map, 
+    c_A=c, eta=eta, 
+    num_trials=pga_num_trials, iters_per_trial=pga_iters_per_trial, lr=pga_lr, 
+    use_gpu=True)
 
-    # show absolute difference of truth and perturbed reconstruction 
-    plt.figure()
-    plt.imshow(np.abs(X_rec-X_pert_rec))#,interpolation='none')
-    plt.colorbar()
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig('NESTA_TV_Haar_stability-%s_adv_abs_err.png' % im_name, dpi=300)
-    
-    # save perturbed and reconstruction of perturbed image
-    im_pert = np.clip(np.abs(X_pert)*255,0,255).astype('uint8')
-    im_pert_rec = np.clip(np.abs(X_pert_rec)*255,0,255).astype('uint8')
- 
-    Image.fromarray(im_pert).save(
-        'NESTA_TV_Haar_stability-%s_im_pert.png' % im_name)   
-    Image.fromarray(im_pert_rec).save(
-        'NESTA_TV_Haar_stability-%s_im_pert_rec.png' % im_name)
+adv_pert_t = adv_pert_t.cpu()
+X_pert_t = X_pert_t.cpu()
+X_pert_rec_t = X_pert_rec_t.cpu()
+
+adv_pert = np.reshape(adv_pert_t.numpy(),(N,N))
+X_pert = np.reshape(X_pert_t.numpy(),(N,N))
+X_pert_rec = np.reshape(X_pert_rec_t.numpy(),(N,N))
+
+print(
+    "Perturbation size:", 
+    np.linalg.norm(adv_pert,'fro'))
+print(
+    "Perturbation reconstruction error:", 
+    np.linalg.norm(X_rec-X_pert_rec,'fro'))
+
+# show adversarial perturbation rescaled
+plt.figure()
+plt.imshow(np.abs(adv_pert))#,interpolation='none')
+plt.colorbar()
+plt.xticks([])
+plt.yticks([])
+plt.savefig('NESTA_TV_Haar_stability-adv_pert.png', dpi=300)
+
+# show absolute difference of truth and perturbed reconstruction 
+plt.figure()
+plt.imshow(np.abs(X_rec-X_pert_rec))#,interpolation='none')
+plt.colorbar()
+plt.xticks([])
+plt.yticks([])
+plt.savefig('NESTA_TV_Haar_stability-adv_abs_err.png', dpi=300)
+
+# save perturbed and reconstruction of perturbed image
+im_pert = np.clip(np.abs(X_pert)*255,0,255).astype('uint8')
+im_pert_rec = np.clip(np.abs(X_pert_rec)*255,0,255).astype('uint8')
+
+Image.fromarray(im_pert).save('NESTA_TV_Haar_stability-im_pert.png')   
+Image.fromarray(im_pert_rec).save('NESTA_TV_Haar_stability-im_pert_rec.png')
