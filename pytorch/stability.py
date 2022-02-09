@@ -1,7 +1,7 @@
 import math
 import torch
 
-def adv_perturbation(x, opA, opR, c_A, eta, lr, num_iters, use_gpu=False):
+def adv_perturbation(x, opA, opR, eta, lr, num_iters, use_gpu=False):
     """
     Computes an adversarial perturbation for a (differentiable) reconstruction
     method for recovering a vector x given measurements y = A @ x + e. Here A 
@@ -24,7 +24,6 @@ def adv_perturbation(x, opA, opR, c_A, eta, lr, num_iters, use_gpu=False):
         x (torch.Tensor) : ground truth vector
         opA (function) : measurement operator A
         opR (function) : reconstruction map
-        c_A (float) : constant c for which A @ A^* = c*I
         eta (float) : constraint for e
         lr (float) : learning rate for GA
         num_iters (int) : number of iterations of GA
@@ -86,8 +85,4 @@ def adv_perturbation(x, opA, opR, c_A, eta, lr, num_iters, use_gpu=False):
                 best_obj_val = obj_val
                 best_e = e.detach().clone()
     
-    pert = opA(best_e,0)/c_A
-    x_pert = x + pert
-    x_pert_rec = opR(y+best_e)
-
-    return pert, x_pert, x_pert_rec
+    return best_e

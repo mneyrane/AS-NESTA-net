@@ -29,18 +29,21 @@ with Image.open("../demo_images/brain_512.png") as im:
     X = np.asarray(im).astype(float) / 255
 
 
-### fixed parameters
-eta = 2.5e1           # noise level
-sample_rate = 0.25  # sample rate
-outer_iters = 6     # num of restarts + 1
-r = 1/4             # decay factor
-zeta = 1e-12        # CS error parameter
-delta = 0.2         # rNSP parameter
-
-pga_num_trials = 50
-pga_iters_per_trial = 20
+### grid parameters
+eta = 10**(np.arange(-3,2,1,dtype=float))       # noise level
+pert_factor = 10**(np.arange(0,4,dtype=float))  # perturbation size multiplier
 pga_lr = 0.1*eta
 
+### parameters
+sample_rate = 0.15      # sample rate
+outer_iters = 3        # num of restarts + 1
+r = 1/4                 # decay factor
+zeta = 1e-12            # CS error parameter
+delta = 0.5           # rNSP parameter
+pga_num_trials = 2    # projected GA trials
+pga_num_iters = 10     # projected GA number of iterations
+
+fname_prefix = "NESTA_TV_Haar_stability"
 
 # inferred parameters 
 # (some of these are defined early since they we will define the
@@ -78,7 +81,7 @@ uni_mask[~var_mask] = uni_mask_cond
 mask = uni_mask | var_mask
 assert np.sum(mask) == np.sum(var_mask)+np.sum(uni_mask)
 
-Image.fromarray(mask).save('NESTA_TV_Haar_stability-mask.png')
+Image.fromarray(mask).save(fname_prefix + '-mask.png')
 
 m_exact = np.sum(mask)
 mask_t = (torch.from_numpy(mask)).bool().cuda()
@@ -126,23 +129,6 @@ e1 = (torch.arange(m_exact) == 0).float().cuda()
 c = torch.linalg.norm(subsampled_ft(e1,0), 2)**2
 c = c.cpu()
 
-
-### perform stability experiments on several images
-
-# define reconstruction map
-z0 = torch.zeros(N*N,dtype=torch.complex128)
-z0 = z0.cuda()
-
-def recon_map(y):
-    rec, _ = nn.restarted_nesta_wqcbp(
-        y, z0,
-        subsampled_ft, tv_haar, 
-        c, sqrt_beta_tv_haar,
-        inner_iters, outer_iters,
-        eta, mu, False)
-    return rec
-
-
 ### compute measurements
 
 X_flat_t = torch.from_numpy(np.reshape(X,N*N))
@@ -151,66 +137,51 @@ X_flat_t = X_flat_t.cuda()
 y = subsampled_ft(X_flat_t,1)
 y = y.cuda()
 
-
-### reconstruct image using restarted NESTA 
-
-X_rec_t = recon_map(y)
-
-### save reconstructions
-
-X_rec_t = X_rec_t.cpu()
-X_rec = np.reshape(X_rec_t.numpy(),(N,N))
-im_rec = np.clip(np.abs(X_rec)*255,0,255).astype('uint8')
-
-print(
-    "Relative error of reconstruction:", 
-    np.linalg.norm(X-X_rec,'fro')/np.linalg.norm(X,'fro'))
-
-Image.fromarray(im_rec).save('NESTA_TV_Haar_stability-im_rec.png')
+# define initial guess
+z0 = torch.zeros(N*N,dtype=torch.complex128)
+z0 = z0.cuda()
 
 
-### compute worst-case perturbation
+### ~~ perform stability experiment ~~
+num_exps = len(eta)*len(pert_factor)
 
-adv_pert_t, X_pert_t, X_pert_rec_t = stability.adversarial_perturbation(
-    X_flat_t, subsampled_ft, recon_map, 
-    c_A=c, eta=eta, 
-    num_trials=pga_num_trials, iters_per_trial=pga_iters_per_trial, lr=pga_lr, 
-    use_gpu=True)
+exps_label_pad_len = len(str(num_exps))
+trial_pad_len = len(str(pga_num_trials))
 
-adv_pert_t = adv_pert_t.cpu()
-X_pert_t = X_pert_t.cpu()
-X_pert_rec_t = X_pert_rec_t.cpu()
+exps_counter = 0
 
-adv_pert = np.reshape(adv_pert_t.numpy(),(N,N))
-X_pert = np.reshape(X_pert_t.numpy(),(N,N))
-X_pert_rec = np.reshape(X_pert_rec_t.numpy(),(N,N))
+for i in range(len(eta)):
+    for j in range(len(pert_factor)):
+        print('Stability experiment (i,j) =', (i,j))
+        exps_label = str(exps_counter).zfill(exps_label_pad_len)
 
-print(
-    "Perturbation size:", 
-    np.linalg.norm(adv_pert,'fro'))
-print(
-    "Perturbation reconstruction error:", 
-    np.linalg.norm(X_rec-X_pert_rec,'fro'))
+        # define reconstruction map
+        def recon_map(y):
+            rec, _ = nn.restarted_nesta_wqcbp(
+                y, z0,
+                subsampled_ft, tv_haar, 
+                c, sqrt_beta_tv_haar,
+                inner_iters, outer_iters,
+                eta[i], mu, False)
+            return rec
 
-# show adversarial perturbation rescaled
-plt.figure()
-plt.imshow(np.abs(adv_pert))#,interpolation='none')
-plt.colorbar()
-plt.xticks([])
-plt.yticks([])
-plt.savefig('NESTA_TV_Haar_stability-adv_pert.png', dpi=300)
+        
+        ### compute worst-case perturbation
+                 
+        for t in range(pga_num_trials):
 
-# show absolute difference of truth and perturbed reconstruction 
-plt.figure()
-plt.imshow(np.abs(X_rec-X_pert_rec))#,interpolation='none')
-plt.colorbar()
-plt.xticks([])
-plt.yticks([])
-plt.savefig('NESTA_TV_Haar_stability-adv_abs_err.png', dpi=300)
+            adv_noise_t = stability.adv_perturbation(
+                X_flat_t, subsampled_ft, recon_map, 
+                eta=pert_factor[j]*eta[i], 
+                lr=pert_factor[j]*pga_lr[i], 
+                num_iters=pga_num_iters,
+                use_gpu=True)
 
-# save perturbed and reconstruction of perturbed image
-im_pert = np.clip(np.abs(X_pert)*255,0,255).astype('uint8')
-im_pert_rec = np.clip(np.abs(X_pert_rec)*255,0,255).astype('uint8')
+            adv_noise_t = adv_noise_t.cpu()
+            adv_noise = adv_noise_t.numpy()
+            
+            trial_str = 'trial_' + str(t).zfill(trial_pad_len)
+            
+            np.save(fname_prefix + ('-%s-adv_noise-%s.npy' % (exps_label, trial_str)), adv_noise)
 
-Image.fromarray(im_pert).save('NESTA_TV_Haar_stability-im_pert.png')   
-Image.fromarray(im_pert_rec).save('NESTA_TV_Haar_stability-im_pert_rec.png')
+        exps_counter += 1
