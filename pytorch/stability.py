@@ -1,6 +1,7 @@
+import math
 import torch
 
-def adversarial_perturbation(x, opA, opR, c_A, eta, num_trials, iters_per_trial, lr, use_gpu=False):
+def adv_perturbation(x, opA, opR, c_A, eta, lr, num_iters, use_gpu=False):
     """
     Computes an adversarial perturbation for a (differentiable) reconstruction
     method for recovering a vector x given measurements y = A @ x + e. Here A 
@@ -25,9 +26,8 @@ def adversarial_perturbation(x, opA, opR, c_A, eta, num_trials, iters_per_trial,
         opR (function) : reconstruction map
         c_A (float) : constant c for which A @ A^* = c*I
         eta (float) : constraint for e
-        num_trials (int) : number of GA trials
-        iters_per_trial (int) : max number of GA iterations
-        lr (float) : learning rate for Adam optimizer
+        lr (float) : learning rate for GA
+        num_iters (int) : number of iterations of GA
         use_gpu (bool) : use CUDA for calculations
 
     Returns:
@@ -42,74 +42,52 @@ def adversarial_perturbation(x, opA, opR, c_A, eta, num_trials, iters_per_trial,
             Robustness Included?" Genzel, et al. arXiv:2011.04268.
     """
     y = opA(x,1)
-    Ry = opR(y)
-
+    x_rec = opR(y)
+    
     N = x.shape[0]
     m = y.shape[0]
 
     # squared-norm function for complex tensors
     sq_norm = lambda z : torch.vdot(z,z)
-    obj_fn = lambda p : -0.5*sq_norm(opR(y+p)-Ry)
+    obj_fn = lambda e : -0.5*sq_norm(opR(y+e)-x_rec)
     
-    max_err = -float('Inf')
+    best_obj_val = -float('Inf')
+    obj_val = None
     best_e = None
+    
+    if use_gpu:
+        noise = torch.randn(2*m, dtype=torch.float64, device=0)
+    else:
+        noise = torch.randn(2*m, dtype=torch.float64)
 
-    for t in range(num_trials):
+    noise = (eta/math.sqrt(m))*noise/torch.linalg.norm(noise,ord=2)
+    
+    e = noise[:m] + 1j*noise[m:]
+    e.requires_grad_()
 
-        if use_gpu:
-            noise = torch.randn(2*m, dtype=torch.float64, device=0)
-        else:
-            noise = torch.randn(2*m, dtype=torch.float64)
+    optimizer = torch.optim.SGD([e], lr=lr)
+    
+    for i in range(num_iters):
+        # descent step
+        optimizer.zero_grad()
+        obj = obj_fn(e)
+        obj.backward()
+        optimizer.step()
 
-        noise = (eta/m)*noise/torch.linalg.norm(noise,ord=2)
-        
-        e = noise[:m] + 1j*noise[m:]
-        e.requires_grad_()
-        
-        optimizer = torch.optim.SGD([e], lr=lr)
-        #scheduler = ...
-        
-        for i in range(iters_per_trial):
-            # descent step
-            optimizer.zero_grad()
-            obj = obj_fn(e)
-            obj.backward()
-            optimizer.step()
-
-            with torch.no_grad():
-                # projection
-                e_len = torch.linalg.norm(e,ord=2)
-                if e_len > eta:
-                    e = eta*(e/e_len)
-
-                obj_val = -torch.real(obj_fn(e))
-                obj_val = obj_val.cpu()
-                print(
-                    'Step %d -- norm(e): %.5e -- obj val: %.5e' % 
-                    (i+1, min(eta, float(e_len)), float(obj_val))
-                )
-
-            # for autograd
-            e.requires_grad_() 
-        
         with torch.no_grad():
-            z = opA(e,0)/c_A
+            # projection
+            e_len = torch.linalg.norm(e,ord=2)
+            if e_len > eta:
+                e.multiply_(eta/e_len)
             
-            #torch.testing.assert_close(opA(z,1),e)
-            #torch.testing.assert_close(opA(x+z,1),y+e) 
+            obj_val = -torch.real(obj_fn(e))
             
-            Ry_e = opR(opA(x+z,1))
-            
-            err = torch.linalg.norm(Ry_e-Ry,ord=2)
-            
-            if err > max_err:
-                print("Found noise with higher error at trial", t)
-                max_err = err
-                best_e = e.detach()
-
-    print("Maximum absolute error produced:", max_err)
+            if obj_val > best_obj_val:
+                best_obj_val = obj_val
+                best_e = e.detach().clone()
+    
     pert = opA(best_e,0)/c_A
     x_pert = x + pert
-    x_pert_rec = opR(opA(x_pert,1))
+    x_pert_rec = opR(y+best_e)
 
     return pert, x_pert, x_pert_rec
