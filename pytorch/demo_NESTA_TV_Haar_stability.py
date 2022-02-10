@@ -36,11 +36,11 @@ pga_lr = 0.1*eta
 
 ### parameters
 sample_rate = 0.15      # sample rate
-outer_iters = 3        # num of restarts + 1
+outer_iters = 15        # num of restarts + 1
 r = 1/4                 # decay factor
 zeta = 1e-12            # CS error parameter
-delta = 0.5           # rNSP parameter
-pga_num_trials = 2    # projected GA trials
+delta = 0.05            # rNSP parameter
+pga_num_trials = 2      # projected GA trials
 pga_num_iters = 10     # projected GA number of iterations
 
 fname_prefix = "NESTA_TV_Haar_stability"
@@ -61,7 +61,7 @@ for k in range(outer_iters):
 
 sqrt_beta_tv_haar = 2.0
 
-inner_iters = math.ceil(sqrt_beta_tv_haar*(4+r)/(r*math.sqrt(N)*delta))
+inner_iters = math.ceil(4*sqrt_beta_tv_haar/(r*math.sqrt(N)*delta))
 print('Inner iterations:', inner_iters)
 
 
@@ -169,6 +169,7 @@ for i in range(len(eta)):
         ### compute worst-case perturbation
                  
         for t in range(pga_num_trials):
+            print('Trial %d' % t)
 
             adv_noise_t = stability.adv_perturbation(
                 X_flat_t, subsampled_ft, recon_map, 
