@@ -2,7 +2,6 @@ import operators as op
 import torch
 from torch.nn.functional import relu
 from torch.linalg import norm
-from torch.utils.checkpoint import checkpoint
 
 def nesta_wqcbp(y, z0, opA, opW, c_A, L_W, num_iters, eta, mu, store_hist):
 
@@ -57,9 +56,7 @@ def restarted_nesta_wqcbp(y, z0, opA, opW, c_A, L_W, in_iters, re_iters, eta, mu
 
     for k in range(re_iters):
         mu = mu_seq[k]
-        z, inner_its_list = checkpoint(
-            nesta_wqcbp, 
-            y, z, opA, opW, c_A, L_W, in_iters, eta, mu, store_hist)
+        z, inner_its_list = nesta_wqcbp(y, z, opA, opW, c_A, L_W, in_iters, eta, mu, store_hist)
 
         if store_hist:
             all_iterates.append(inner_its_list)
@@ -125,9 +122,7 @@ def restarted_nesta_bernoulli_wqcbp(y1, y2, z0, opB, opW, c_B, L_W, in_iters, re
 
     for k in range(re_iters):
         mu = mu_seq[k]
-        z, inner_its_list = checkpoint(
-            nesta_bernoulli_wqcbp,
-            y1, y2, z, opB, opW, c_B, L_W, in_iters, eta, mu, store_hist)
+        z, inner_its_list = nesta_bernoulli_wqcbp(y1, y2, z, opB, opW, c_B, L_W, in_iters, eta, mu, store_hist)
 
         if store_hist:
             all_iterates.append(inner_its_list)
