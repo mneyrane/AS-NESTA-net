@@ -81,11 +81,17 @@ def adv_perturbation(x, opA, opR, c_A, eta, lr, num_iters, use_gpu=False):
                 e.multiply_(eta/e_len)
             
             obj_val = -torch.real(obj_fn(e))
+
+            obj_val = obj_val.cpu()
+            print(
+                'Step %d -- norm(e): %.5e -- obj val: %.5e' %
+                (i+1, min(eta, float(e_len)), float(obj_val))
+            )
             
             if obj_val > best_obj_val:
                 best_obj_val = obj_val
                 best_e = e.detach().clone()
-    
+
     pert = opA(best_e,0)/c_A
     x_pert = x + pert
     x_pert_rec = opR(y+best_e)

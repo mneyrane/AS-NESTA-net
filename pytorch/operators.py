@@ -2,6 +2,7 @@
 -- Maksym Neyra-Nesterenko
 -- mneyrane@sfu.ca
 """
+import math
 import numpy as np
 import torch
 import torch.fft as FT
@@ -97,7 +98,7 @@ def fourier_2d(x, mode, N, mask, use_gpu=False):
         y = FT.ifft2(FT.fftshift(z), norm='ortho')
         return y.reshape(-1)
 
-def discrete_haar_wavelet(x, mode, N, levels=1):
+def discrete_haar_wavelet_2d(x, mode, N, levels=1):
     """ 2-D discrete Haar wavelet transform  
 
     Boundary conditions are resolved with periodic padding.
@@ -159,3 +160,23 @@ def discrete_haar_wavelet(x, mode, N, levels=1):
             Nt = 2*Np
 
         return Y.reshape(-1)
+
+def tv_haar_2d(x, mode, N, lam, levels):
+    """ 2-D TV-Haar transform.
+    
+    This combines `discrete_gradient_2d` and `discrete_haar_wavelet_2d`
+    into one operation, where the discrete gradient is weighted by the
+    square root of `lam`.
+    """
+    if mode == 1:
+        dgrad_x = discrete_gradient_2d(x,1,N,N) * math.sqrt(lam)
+        wave_x = discrete_haar_wavelet_2d(x,1,N,levels)
+        y = torch.cat([dgrad_x, wave_x])
+        return y
+    else: # adjoint
+        x1 = x[:2*N*N]
+        x2 = x[2*N*N:]
+        y1 = discrete_gradient_2d(x1,0,N,N) * math.sqrt(lam)
+        y2 = discrete_haar_wavelet_2d(x2,0,N,levels)
+        y = y1+y2
+        return y
