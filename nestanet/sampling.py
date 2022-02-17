@@ -7,7 +7,7 @@ Note: everything here uses NumPy arrays.
 -- mneyrane@sfu.ca
 """
 import numpy as np
-from scipy.optimize import bisect
+from scipy.optimize import bisect as _bisect
 
 def bernoulli_sampling_probs_2d(hist,N,m):
     """
@@ -27,7 +27,7 @@ def bernoulli_sampling_probs_2d(hist,N,m):
     if np.all(m*hist <= 1.0): # avoid computation for trivial case
         return m*hist
 
-    C = bisect(_constraint, 0.0, 1.0, args=(m, hist), xtol=1e-12, maxiter=1000)
+    C = _bisect(_constraint, 0.0, 1.0, args=(m, hist), xtol=1e-12, maxiter=1000)
 
     terms = m*C*hist
     probs = np.where(terms < 1, terms, 1)

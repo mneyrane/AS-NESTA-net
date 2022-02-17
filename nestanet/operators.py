@@ -5,8 +5,7 @@
 import math
 import numpy as np
 import torch
-import torch.fft as FT
-from scipy.optimize import bisect
+import torch.fft as _fft
 
 def huber_fn_gradient(x, mu):
     """ Huber function gradient """
@@ -82,7 +81,7 @@ def fourier_2d(x, mode, N, mask, use_gpu=False):
     assert len(x.shape) == 1, 'Input x is not a vector'
     
     if mode == True:
-        z = FT.fftshift(FT.fft2(x.reshape((N,N)), norm='ortho'))
+        z = _fft.fftshift(_fft.fft2(x.reshape((N,N)), norm='ortho'))
         y = z[mask]
         return y.reshape(-1)
     
@@ -95,7 +94,7 @@ def fourier_2d(x, mode, N, mask, use_gpu=False):
 
         z[mask] = x
         z = z.reshape((N,N))
-        y = FT.ifft2(FT.fftshift(z), norm='ortho')
+        y = _fft.ifft2(_fft.fftshift(z), norm='ortho')
         return y.reshape(-1)
 
 def discrete_haar_wavelet_2d(x, mode, N, levels=1):

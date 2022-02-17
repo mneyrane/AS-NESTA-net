@@ -1,7 +1,7 @@
-import operators as op
+import nestanet.operators as _op
 import torch
-from torch.nn.functional import relu
-from torch.linalg import norm
+from torch.nn.functional import relu as _relu
+from torch.linalg import norm as _norm
 
 def nesta_wqcbp(y, z0, opA, opW, c_A, L_W, num_iters, eta, mu, store_hist):
 
@@ -15,12 +15,12 @@ def nesta_wqcbp(y, z0, opA, opW, c_A, L_W, num_iters, eta, mu, store_hist):
         # compute x_n
         # -----------
         grad = opW(z,1)
-        grad = op.huber_fn_gradient(grad, mu)
+        grad = _op.huber_fn_gradient(grad, mu)
         grad = mu/(L_W*L_W)*opW(grad,0)
         q = z-grad
 
         dy = y-opA(q,1)
-        lam = relu(norm(dy,2)/eta - 1)
+        lam = _relu(_norm(dy,2)/eta - 1)
 
         x = lam/((lam+1)*c_A)*opA(dy,0) + q
 
@@ -35,7 +35,7 @@ def nesta_wqcbp(y, z0, opA, opW, c_A, L_W, num_iters, eta, mu, store_hist):
         q = q_v
 
         dy = y-opA(q,1)
-        lam = relu(norm(dy,2)/eta - 1)
+        lam = _relu(_norm(dy,2)/eta - 1)
 
         v = lam/((lam+1)*c_A)*opA(dy,0) + q
 
@@ -81,12 +81,12 @@ def nesta_bernoulli_wqcbp(y1, y2, z0, opB, opW, c_B, L_W, num_iters, eta, mu, st
         # compute x_n
         # -----------
         grad = opW(z,1)
-        grad = op.huber_fn_gradient(grad, mu)
+        grad = _op.huber_fn_gradient(grad, mu)
         grad = mu/(L_W*L_W)*opW(grad,0)
         q = z-grad
 
         dy = y_sum-2*opB(q,1)
-        lam = relu(0.5*(1-torch.sqrt(d_noise/torch.real(torch.vdot(dy,dy)))))
+        lam = _relu(0.5*(1-torch.sqrt(d_noise/torch.real(torch.vdot(dy,dy)))))
 
         x = (lam/c_B)*opB(dy,0) + q
 
@@ -101,7 +101,7 @@ def nesta_bernoulli_wqcbp(y1, y2, z0, opB, opW, c_B, L_W, num_iters, eta, mu, st
         q = q_v
 
         dy = y_sum-2*opB(q,1)
-        lam = relu(0.5*(1-torch.sqrt(d_noise/torch.real(torch.vdot(dy,dy)))))
+        lam = _relu(0.5*(1-torch.sqrt(d_noise/torch.real(torch.vdot(dy,dy)))))
 
         v = (lam/c_B)*opB(dy,0) + q
 
