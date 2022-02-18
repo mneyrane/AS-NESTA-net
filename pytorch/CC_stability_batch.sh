@@ -22,24 +22,21 @@ cd NESTA-net/pytorch
 PROJECT_DIR="$HOME/projects/def-adcockb/mneyrane"
 ARCHIVE_NAME="CC_stability_results.tar"
 
-NUM_TRIALS=1
+NUM_TRIALS=1 # each trial produces 16 folders, 4 for each case
 IM_PATH="../demo_images/brain_512.png"
 MASK_PATH="../sampling_masks/tv_haar_mask_25.png"
-ETA_VALUES=(1 0.1 0.01 0.001)
-ETA_MULTS=(1 10 100 1000)
+ETA=0.01
+ETA_MULTS=(10 100 1000 10000)
 
-for ((t=1;t<=NUM_TRIALS;t++)); do
-
-    for i in ${!ETA_VALUES[@]}; do
-
-        for j in ${!ETA_MULTS[@]}; do
-            CUDA_VISIBLE_DEVICES=$j python CC_stability.py --im-path $IM_PATH --mask-path $MASK_PATH --eta ${ETA_VALUES[$i]} --eta-p-mult ${ETA_MULTS[$j]} &
-        done
-
-        wait # for tasks to finish
-
+for ((t=0;t<NUM_TRIALS;t++)); do
+    for i in ${!ETA_MULTS[@]}; do
+        CUDA_VISIBLE_DEVICES=$i python CC_stability.py --im-path $IM_PATH --mask-path $MASK_PATH --eta $ETA --eta-p-mult ${ETA_MULTS[$i]} &
+        sleep 5
     done
-
+    
+    if [ $(($t % 16)) -eq 15 ]; then
+        wait # for tasks to finish
+    fi
 done
 
 shopt -s extglob

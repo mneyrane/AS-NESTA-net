@@ -49,13 +49,13 @@ os.chdir(dir_name)
 eta = args.eta                      # noise level
 eta_pert = args.eta_p_mult * eta    # perturbation noise multiplier
 
-outer_iters = 11    # num of restarts + 1
-r = 1/5            # decay factor
+outer_iters = 6    # num of restarts + 1
+r = 1/4            # decay factor
 zeta = 1e-9        # CS error parameter
-delta = 0.05      # rNSP parameter
+delta = 0.125      # rNSP parameter
 
-pga_num_iters = 5   # gradient ascent iterations
-pga_lr = 1.0        # gradient ascent step size
+pga_num_iters = 200 # gradient ascent iterations
+pga_lr = 2.5        # gradient ascent step size
 
 
 # inferred parameters
@@ -76,7 +76,7 @@ for k in range(outer_iters):
     eps = r*eps + zeta
 
 # gradient Lipschitz constant of smoothed TV-Haar
-lam = 0.25
+lam = 1.0
 L_W = math.sqrt(1+8*lam)
 
 # inner iterations
@@ -150,6 +150,7 @@ np.save('adv_pert.npy', adv_pert)
 np.save('im_pert_rec.npy', X_pert_rec)
 
 with open('params.txt','w') as params_fd:
+    print("rel rec error:", np.linalg.norm(X_rec-X,'fro')/np.linalg.norm(X,'fro'), file=params_fd)
     print("eta:", eta, file=params_fd)
     print("eta pert:", eta_pert, file=params_fd)
     print("pert size:", np.linalg.norm(adv_pert,'fro'), file=params_fd)
