@@ -29,7 +29,7 @@ with Image.open("../images/GPLU_phantom_512.png") as im:
 ### parameters
 
 # fixed parameters
-eta = 1e-1          # noise level
+eta = 1e-3          # noise level
 sample_rate = 0.15  # sample rate
 outer_iters = 12    # num of restarts + 1
 r = 1/4             # decay factor 
@@ -38,7 +38,7 @@ delta = 0.05        # rNSP parameter
 lam = 2.5
 
 # smoothing parameter for NESTA (without restarts)
-nesta_mu = 2**np.arange(-9,-14,-1, dtype=float) 
+nesta_mu = 10**np.arange(-2,-6,-1, dtype=float) 
 
 # inferred parameters (mu and inner_iters are defined later)
 eps0 = np.linalg.norm(X,'fro')
@@ -183,13 +183,12 @@ for n_mu in n_rel_errs:
     plt.semilogy(
         range(1,total_iters+1), 
         n_rel_errs[n_mu], 
-        label='No restart, $\\mu = 2^{%d}$' % math.log2(n_mu),
+        label='No restart, $\\mu = 10^{%d}$' % math.log10(n_mu),
         linewidth=1)
 
 plt.xlabel('Iteration')
 plt.ylabel('Relative error')
-plt.ylim(bottom=1e-3)
-plt.legend(loc='upper right')
+plt.legend(loc='lower left')
 plt.savefig(
     'compare_without_restarts-plot.png', 
     bbox_inches='tight',
