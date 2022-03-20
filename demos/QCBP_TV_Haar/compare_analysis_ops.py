@@ -5,9 +5,6 @@ Compare recoveries of TV-Haar, TV, and Haar minimization.
 The setup is to solve a smoothed analysis QCBP problem with a TV-Haar, TV,
 and Haar analysis operators to recover an image from subsampled Fourier 
 measurements.
-
--- Maksym Neyra-Nesterenko
--- mneyrane@sfu.ca
 """
 import math
 import operators
@@ -34,12 +31,13 @@ with Image.open("../demo_images/brain_512.png") as im:
 ### parameters
 
 # fixed parameters
-eta = 1e-3          # noise level
-sample_rate = 0.30  # sample rate
+lam = 5.            # TV-Haar weight
+eta = 1e-4          # noise level
+sample_rate = 0.20  # sample rate
 outer_iters = 15    # num of restarts + 1
-r = 1/5             # decay factor
-zeta = 1e-12        # CS error parameter
-delta = 0.04         # rNSP parameter
+r = 1/4             # decay factor
+zeta = 1e-9         # CS error parameter
+delta = 0.055       # rNSP parameter
 
 # inferred parameters (mu and inner_iters are defined later)
 eps0 = np.linalg.norm(X,'fro')
@@ -79,19 +77,6 @@ print('Actual sample rate:', m_exact/(N*N))
 subsampled_ft = lambda x, mode: operators.fourier_2d(x,mode,N,mask_t,use_gpu=True)*(N/math.sqrt(m))
 
 # define TV-Haar operator
-def custom_op_tv_haar(x,mode,N,levels):
-    if mode == 1:
-        dgrad_x = operators.discrete_gradient_2d(x,1,N,N)
-        wave_x = operators.discrete_haar_wavelet(x,1,N,levels)
-        y = torch.cat([dgrad_x, wave_x])
-        return y
-    else: # adjoint
-        x1 = x[:2*N*N]
-        x2 = x[2*N*N:]
-        y1 = operators.discrete_gradient_2d(x1,0,N,N)
-        y2 = operators.discrete_haar_wavelet(x2,0,N,levels)
-        y = y1+y2
-        return y
 
 # compute maximum Haar wavelet resolution
 nlevmax = 0
@@ -101,12 +86,12 @@ while N % 2**(nlevmax+1) == 0:
 
 assert nlevmax > 0
 
-op_tv_haar = lambda x, mode: custom_op_tv_haar(x,mode,N,nlevmax)
+op_tv_haar = lambda x, mode: operators.tv_haar_2d(x,mode,N,lam,nlevmax)
 op_tv = lambda x, mode: operators.discrete_gradient_2d(x,mode,N,N)
-op_haar = lambda x, mode: operators.discrete_haar_wavelet(x,mode,N,nlevmax)
+op_haar = lambda x, mode: operators.discrete_haar_wavelet_2d(x,mode,N,nlevmax)
 
-L_tv_haar = 2.
-L_tv = 2.
+L_tv_haar = math.sqrt(1+8*lam)
+L_tv = 2.*math.sqrt(2.)
 L_haar = 1.
 
 op_params = {
@@ -136,7 +121,7 @@ y = subsampled_ft(X_flat_t,1) + noise
 ### reconstruct image using restarted NESTA for each analysis operator
 
 # fix the inner iterations for each analysis operator
-inner_iters = math.ceil(L_tv_haar*(4+r)/(r*math.sqrt(N)*delta))
+inner_iters = math.ceil(2*L_tv_haar/(r*math.sqrt(N)*delta))
 print('Inner iterations:', inner_iters)
 
 # compute mu
