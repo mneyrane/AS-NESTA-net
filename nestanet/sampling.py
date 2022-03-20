@@ -2,9 +2,6 @@
 Helper functions for constructing sampling masks.
 
 Note: everything here uses NumPy arrays.
-
--- Maksym Neyra-Nesterenko
--- mneyrane@sfu.ca
 """
 import numpy as np
 from scipy.optimize import bisect as _bisect

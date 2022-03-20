@@ -1,7 +1,3 @@
-"""
--- Maksym Neyra-Nesterenko
--- mneyrane@sfu.ca
-"""
 import math
 import numpy as np
 import torch

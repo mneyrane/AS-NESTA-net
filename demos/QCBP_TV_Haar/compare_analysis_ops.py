@@ -5,9 +5,6 @@ Compare recoveries of TV-Haar, TV, and Haar minimization.
 The setup is to solve a smoothed analysis QCBP problem with a TV-Haar, TV,
 and Haar analysis operators to recover an image from subsampled Fourier 
 measurements.
-
--- Maksym Neyra-Nesterenko
--- mneyrane@sfu.ca
 """
 import math
 import operators

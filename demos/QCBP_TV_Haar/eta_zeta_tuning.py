@@ -5,9 +5,6 @@ using restarted NESTA for measurements with no noise.
 
 The setup is to solve a smoothed analysis QCBP problem with a TV-Haar analysis 
 operator to recover an image from subsampled Fourier measurements.
-
--- Maksym Neyra-Nesterenko
--- mneyrane@sfu.ca
 """
 import math
 import nestanet.operators as n_op

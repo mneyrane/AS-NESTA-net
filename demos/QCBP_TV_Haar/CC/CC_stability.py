@@ -1,9 +1,6 @@
 """
 Modification of stability experiments (bad_perturbation.py) to run on
 Compute Canada clusters.
-
--- Maksym Neyra-Nesterenko
--- mneyrane@sfu.ca
 """
 import argparse
 import os
