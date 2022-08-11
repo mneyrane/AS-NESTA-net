@@ -4,7 +4,7 @@ This repository contains the numerical experiments of the paper [Stable, accurat
 
 ## Requirements
 
-The experiments are written in [Python](https://www.python.org/downloads/) and can be run on any Linux-based distribution. 
+The experiments are written in [Python](https://www.python.org/downloads/) and can be run on any Linux distribution, provided the right Python version is packaged. 
 
 To run the experiments without issues, these were run with Python 3.9 and using
 

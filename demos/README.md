@@ -1,8 +1,7 @@
 # Experiments
 
-The main code for the paper is found under `QCBP_TV_Haar/` and the test images are in `images/`. The subfolder(s) named `CC/` correspond to stability experiment code modified to run at a larger scale on [Compute Canada](https://www.computecanada.ca/) clusters.
+The code for the paper is found under `QCBP_TV_Haar/` and the test images are in `images/`. The subfolder(s) named `CC/` correspond to stability experiment code modified to run at a larger scale on [Compute Canada](https://www.computecanada.ca/) clusters.
 
-The other folders are discontinued and left here for archival purposes. They may be repurposed in the future.
 
 ## Test image attributions
 
