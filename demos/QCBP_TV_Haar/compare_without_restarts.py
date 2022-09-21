@@ -85,6 +85,7 @@ assert nlevmax > 0
 
 W = lambda x, mode: n_op.tv_haar_2d(x,mode,N,lam,nlevmax)
 L_W = math.sqrt(1+8*lam)
+M = 3*N*N # output dimension of W
 
 
 ### define the inverse problem
@@ -107,7 +108,7 @@ c_A = c_A.cpu()
 ### compute restarted NESTA solution
 
 norm_fro_X = np.linalg.norm(X,'fro')
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(N)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
 total_iters = outer_iters*inner_iters
 print('Inner iterations:', inner_iters)
 print('Total iterations:', total_iters)

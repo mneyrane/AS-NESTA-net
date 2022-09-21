@@ -94,10 +94,14 @@ L_tv_haar = math.sqrt(1+8*lam)
 L_tv = 2.*math.sqrt(2.)
 L_haar = 1.
 
+M_tv_haar = 3*N*N
+M_tv = 2*N*N
+M_haar = N*N
+
 op_params = {
-    "tv-haar" : (op_tv_haar, L_tv_haar), 
-    "tv" : (op_tv, L_tv), 
-    "haar" : (op_haar, L_haar),
+    "tv-haar" : (op_tv_haar, L_tv_haar, M_tv_haar), 
+    "tv" : (op_tv, L_tv, M_tv), 
+    "haar" : (op_haar, L_haar, M_haar),
 }
 
 
@@ -121,7 +125,8 @@ y = subsampled_ft(X_flat_t,1) + noise
 ### reconstruct image using restarted NESTA for each analysis operator
 
 # fix the inner iterations for each analysis operator
-inner_iters = math.ceil(2*L_tv_haar/(r*math.sqrt(N)*delta))
+# note that the largest Lipschitz constnat is L_tv_haar and smallest M is N*N
+inner_iters = math.ceil(2*L_tv_haar/(r*N*delta))
 print('Inner iterations:', inner_iters)
 
 # compute mu
@@ -137,7 +142,7 @@ for op_name in op_params:
     
     ### compute restarted NESTA solution
 
-    opW, L_W = op_params[op_name]
+    opW, L_W, M = op_params[op_name]
     
     z0 = torch.zeros(N*N,dtype=y.dtype)
         

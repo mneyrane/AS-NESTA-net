@@ -84,6 +84,7 @@ assert nlevmax > 0
 
 W = lambda x, mode: n_op.tv_haar_2d(x,mode,N,lam,nlevmax)
 L_W = math.sqrt(1+8*lam)
+M = 3*N*N # output dimension of W
 
 
 ### compute normalizing constant for orthonormal rows of A
@@ -102,7 +103,7 @@ y = A(X_vec_t,1)
 norm_fro_X = np.linalg.norm(X,'fro')
 print('Frobenius norm of X:', norm_fro_X)
 
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(N)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
 print('Inner iterations:', inner_iters)
 
 eta_grid, zeta_grid = np.meshgrid(eta, zeta, indexing='ij')

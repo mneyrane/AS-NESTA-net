@@ -82,6 +82,7 @@ assert nlevmax > 0
 
 W = lambda x, mode: n_op.tv_haar_2d(x,mode,N,lam,nlevmax)
 L_W = math.sqrt(1+8*lam)
+M = 3*N*N # output dimension of W
 
 
 ### compute normalizing constant for orthonormal rows of A
@@ -99,7 +100,7 @@ for k in range(outer_iters):
     mu.append(r*delta*eps)
     eps = r*eps + zeta
 
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(N)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
 print('Inner iterations:', inner_iters)
 
 # define reconstruction map
