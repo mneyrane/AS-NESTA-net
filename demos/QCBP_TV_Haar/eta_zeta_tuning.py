@@ -34,7 +34,7 @@ zeta = 10**(np.arange(1,-8,-1,dtype=float)) # CS error parameter
 sample_rate = 0.25  # sample rate
 outer_iters = 15    # num of restarts + 1
 r = 1/4             # decay factor
-delta = 0.05        # rNSP parameter
+delta = 1.25e-3     # rNSP parameter
 lam = 2.5           # TV-Haar parameter
 
 # inferred parameters (mu and inner_iters are defined later)
@@ -103,7 +103,7 @@ y = A(X_vec_t,1)
 norm_fro_X = np.linalg.norm(X,'fro')
 print('Frobenius norm of X:', norm_fro_X)
 
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta)) - 1
 print('Inner iterations:', inner_iters)
 
 eta_grid, zeta_grid = np.meshgrid(eta, zeta, indexing='ij')
@@ -141,7 +141,8 @@ for i in range(len(eta)):
         errs[i,j] = np.linalg.norm(X-X_rec,'fro')
 
 ### plots
-sns.set(context='paper', style='whitegrid')
+sns.set(context='paper', style='whitegrid', font='sans', font_scale=1.4, rc={'text.usetex' : True})
+
 xticklabels = np.log10(zeta).astype(int)
 yticklabels = np.log10(eta).astype(int)
 sns.heatmap(
@@ -151,4 +152,4 @@ sns.heatmap(
 plt.yticks(rotation=0)
 plt.xlabel('$\\log_{10}(\\zeta)$')
 plt.ylabel('$\\log_{10}(\\eta)$')
-plt.savefig('eta_zeta_tuning-plot.png', bbox_inches='tight', dpi=300)
+plt.savefig('eta_zeta_tuning-plot.pdf', bbox_inches='tight', dpi=300)

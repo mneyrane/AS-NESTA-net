@@ -50,7 +50,7 @@ sample_rate = 0.25       # sample rate
 outer_iters = 10         # num of restarts + 1
 r = 1/4                  # decay factor
 zeta = 1e-9              # CS error parameter
-delta = 0.1              # rNSP parameter
+delta = 2.33e-3          # rNSP parameter
 lam = 2.5                # TV-Haar parameter
 
 pga_num_iters = 150      # gradient ascent iterations
@@ -100,7 +100,7 @@ for k in range(outer_iters):
     mu.append(r*delta*eps)
     eps = r*eps + zeta
 
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta)) - 1
 print('Inner iterations:', inner_iters)
 
 # define reconstruction map

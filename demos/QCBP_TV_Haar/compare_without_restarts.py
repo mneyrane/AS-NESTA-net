@@ -31,7 +31,7 @@ sample_rate = 0.15  # sample rate
 outer_iters = 12    # num of restarts + 1
 r = 1/4             # decay factor 
 zeta = 1e-9         # CS error parameter
-delta = 0.05        # rNSP parameter
+delta = 1.25e-3     # rNSP parameter
 lam = 2.5
 
 # smoothing parameter for NESTA (without restarts)
@@ -108,7 +108,7 @@ c_A = c_A.cpu()
 ### compute restarted NESTA solution
 
 norm_fro_X = np.linalg.norm(X,'fro')
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta)) - 1
 total_iters = outer_iters*inner_iters
 print('Inner iterations:', inner_iters)
 print('Total iterations:', total_iters)
@@ -168,26 +168,28 @@ assert len(r_rel_errs) == total_iters
 
 ### plots
 
-sns.set(context='paper', style='whitegrid')
+sns.set(context='paper', style='whitegrid', font='sans', font_scale=1.4, rc={'text.usetex' : True})
 
 plt.semilogy(
     range(1,total_iters+1), 
     r_rel_errs, 
     label='Restart scheme',
     linestyle='dashed',
-    linewidth=1.25)
+    linewidth=2)
 
 for n_mu in n_rel_errs:
     plt.semilogy(
         range(1,total_iters+1), 
         n_rel_errs[n_mu], 
-        label='No restart, $\\mu = 10^{%d}$' % math.log10(n_mu),
-        linewidth=1)
+        label='NESTA, $\\mu = 10^{%d}$' % math.log10(n_mu),
+        linewidth=2)
 
+plt.xlim(left=0, right=400)
 plt.xlabel('Iteration')
 plt.ylabel('Relative error')
+
 plt.legend(loc='lower left')
 plt.savefig(
-    'compare_without_restarts-plot.png', 
+    'compare_without_restarts-plot.pdf', 
     bbox_inches='tight',
     dpi=300)

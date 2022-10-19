@@ -10,7 +10,8 @@ regex = re.compile(r'RES-.+-(\d)')
 
 os.makedirs('plots', exist_ok=True)
 
-sns.set(context='paper', style='whitegrid')
+sns.set(context='paper', style='whitegrid', font='sans', font_scale=1.4, rc={'text.usetex' : True})
+
 cmap = 'plasma'
 
 fig, axs = plt.subplots(nrows=4, ncols=2, figsize=(9.5,16))

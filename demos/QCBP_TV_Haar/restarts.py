@@ -26,12 +26,12 @@ with Image.open("../images/GPLU_phantom_512.png") as im:
 ### parameters
 
 # fixed parameters
-eta = [1e0, 1e-1, 1e-2, 1e-3]  # noise level
+eta = [1e0, 1e-1, 1e-2, 1e-3, 1e-4]  # noise level
 sample_rate = 0.15  # sample rate
 outer_iters = 15    # num of restarts + 1
 r = 1/4             # decay factor
 zeta = 1e-9         # CS error parameter
-delta = 0.05        # rNSP parameter
+delta = 1.25e-3     # rNSP parameter
 lam = 2.5           # TV-Haar parameter
 
 # inferred parameters (mu and inner_iters are defined later)
@@ -100,7 +100,7 @@ X_vec_t = torch.from_numpy(np.reshape(X,N*N))
 norm_fro_X = np.linalg.norm(X,'fro')
 print('Frobenius norm of X:', norm_fro_X)
 
-inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta))
+inner_iters = math.ceil(2*L_W/(r*math.sqrt(M)*delta)) - 1
 print('Inner iterations:', inner_iters)
 
 mu = []
@@ -148,7 +148,7 @@ for noise_level in eta:
 
 ### plots
 
-sns.set(context='paper', style='whitegrid')
+sns.set(context='paper', style='whitegrid', font='sans', font_scale=1.4, rc={'text.usetex' : True})
 
 for noise_level in eta:
     end_idx = len(rel_errs_dict[noise_level])+1
@@ -156,10 +156,11 @@ for noise_level in eta:
         range(1,end_idx), 
         rel_errs_dict[noise_level], 
         label='$\\eta = 10^{%d}$' % math.log10(noise_level),
-        marker='*',
-        linewidth=1)
+        marker='o',
+        markersize=4,
+        linewidth=2)
 
 plt.xlabel('Restart')
 plt.ylabel('Relative error')
 plt.legend(loc='lower left')
-plt.savefig('restarts-plot.png', bbox_inches='tight', dpi=300)
+plt.savefig('restarts-plot.pdf', bbox_inches='tight', dpi=300)
