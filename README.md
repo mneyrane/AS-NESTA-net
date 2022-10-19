@@ -19,6 +19,8 @@ To run the experiments without issues, these were run with Python 3.9 and using
 
 We recommend using these versions or later versions.
 
+In addition, one is required to have LaTeX installed to run the current experiments. The plots generated use LaTeX font for text and symbols. Note that this can be circumvented by removing the keyword argument `rc={'text.usetex' : True}` from the `sns.set(...)` call in each experiment script.
+
 ## Running the experiments
 
 To run any of the experiments under `demos/`, we suggest you use a Python [virtual environment](https://docs.python.org/3.9/library/venv.html) to set things up.
