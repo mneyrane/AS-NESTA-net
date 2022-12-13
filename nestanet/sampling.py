@@ -75,7 +75,7 @@ def stacked_scheme_2d(mask1, mask2, N1, N2):
     idxs_2 = np.where(mask2)
 
     idxs_1_flat = np.ravel_multi_index(idxs_1, (N1,N2))
-    idxs_2_flat = np.ravel_multi_index(idxs_1, (N1,N2))
+    idxs_2_flat = np.ravel_multi_index(idxs_2, (N1,N2))
 
     omega_2_diff_1 = np.setdiff1d(idxs_2_flat, idxs_1_flat, assume_unique=True)
     omega_1 = np.concatenate((idxs_1_flat, omega_2_diff_1))
