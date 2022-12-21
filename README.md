@@ -1,4 +1,4 @@
-# Stable, accurate and efficient deep neural networks for inverse problems with analysis-sparse models
+# NESTANets: stable, accurate and efficient neural networks for analysis-sparse inverse problems
 
 This repository contains the numerical experiments of the published article [NESTANets: stable, accurate and efficient neural networks for analysis-sparse inverse problems](https://doi.org/10.1007/s43670-022-00043-5), authored by Maksym Neyra-Nesterenko and Ben Adcock (2023).
 
