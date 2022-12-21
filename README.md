@@ -1,6 +1,6 @@
 # Stable, accurate and efficient deep neural networks for inverse problems with analysis-sparse models
 
-This repository contains the numerical experiments of the paper [Stable, accurate and efficient deep neural networks for inverse problems with analysis-sparse models](https://arxiv.org/abs/2203.00804), authored by Maksym Neyra-Nesterenko and Ben Adcock (2022).
+This repository contains the numerical experiments of the published article [NESTANets: stable, accurate and efficient neural networks for analysis-sparse inverse problems](https://doi.org/10.1007/s43670-022-00043-5), authored by Maksym Neyra-Nesterenko and Ben Adcock (2023).
 
 ## Requirements
 
@@ -40,7 +40,7 @@ Afterwards, clone the repository and then install the `nestanet` package defined
 (env) $ cd AS-NESTA-net
 (env) $ pip install -e .
 ```
-Now you can run any of the code found in `demos/`!
+Now you can run all the experiments except for one, the stability experiment in `CC/`. The latter is organized to be run in computer clusters managed by the [Digital Research Alliance of Canada](https://alliancecan.ca/en/services/advanced-research-computing).
 
 ## Issues
 
@@ -48,4 +48,4 @@ You can post questions, requests, and bugs in [Issues](https://github.com/mneyra
 
 ## Acknowledgements
 
-The unrolled NESTA implementation is adapted from the code for [FIRENET](https://github.com/Comp-Foundations-and-Barriers-of-AI/firenet).
+The unrolled NESTA implementation is adapted from the code for [FIRENETs](https://github.com/Comp-Foundations-and-Barriers-of-AI/firenet).
